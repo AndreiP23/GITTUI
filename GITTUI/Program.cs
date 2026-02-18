@@ -1,7 +1,7 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using DotNetEnv;
+﻿using DotNetEnv;
 using GITTUI.Services;
 using GITTUI.Views;
+using Microsoft.Extensions.DependencyInjection;
 
 // 1. Load Secrets
 Env.Load();
