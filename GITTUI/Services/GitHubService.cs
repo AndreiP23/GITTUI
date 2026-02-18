@@ -42,23 +42,26 @@ namespace GITTUI.Services
 
         public async Task<List<GITActivityModel>> GetRepositoryActivityAsync(string owner, string repoName)
         {
-            // 1. Setup the request options
+            // 1. Create the request object (used for filtering)
+            // We leave it empty to get all types of runs
+            var workflowRequest = new WorkflowRunsRequest();
+
+            // 2. Create the pagination options
             var options = new ApiOptions
             {
-                PageCount = 1,
-                PageSize = 20
+                PageSize = 30,
+                PageCount = 1
             };
 
-            // 2. Call the correct Actions client
-            var response = await _client.Actions.Workflows.Runs.List(owner, repoName);
+            // 3. Call the List method using the 4-parameter overload:
+            // List(string owner, string name, WorkflowRunsRequest request, ApiOptions options)
+            var response = await _client.Actions.Workflows.Runs.List(owner, repoName, workflowRequest, options);
 
-            // 3. Map to your ActivityModel
             return response.WorkflowRuns.Select(run => new GITActivityModel
             {
                 WorkflowName = run.Name,
                 Status = run.Status.StringValue,
-                // Conclusion can be null if the job is still running!
-                Conclusion = run.Conclusion?.StringValue ?? "in_progress",
+                Conclusion = run.Conclusion?.StringValue,
                 CreatedAt = run.CreatedAt.DateTime,
                 Event = run.Event
             }).ToList();
