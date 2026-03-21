@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Publish (linux-x64)
+        run: dotnet publish GITTUI/GITTUI.csproj -c Release -r linux-x64 --self-contained true --no-build -o publish/linux-x64
+
+      - name: Publish (win-x64)
+        run: dotnet publish GITTUI/GITTUI.csproj -c Release -r win-x64 --self-contained true --no-build -o publish/win-x64
+
+      - name: Archive linux-x64 build
+        run: tar -czf gittui-linux-x64.tar.gz -C publish/linux-x64 .
+
+      - name: Archive win-x64 build
+        run: zip -j gittui-win-x64.zip publish/win-x64/*
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            gittui-linux-x64.tar.gz
+            gittui-win-x64.zip
+          generate_release_notes: true
