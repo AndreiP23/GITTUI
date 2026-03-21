@@ -60,5 +60,53 @@ namespace GITTUI.Components
             table.Style.GetOrCreateColumnStyle(colDate).MinWidth =
             table.Style.GetOrCreateColumnStyle(colDate).MaxWidth = 16;
         }
+
+        public static void ApplyGraphTableStyles(TableView table)
+        {
+            if (table.Table == null || table.Table.Columns.Count < 5) return;
+
+            table.Style.ColumnStyles.Clear();
+            table.Style.ExpandLastColumn = false;
+            table.FullRowSelect = false;
+
+            var colDate = table.Table.Columns["Date"];
+            var colSuccess = table.Table.Columns["Success"];
+            var colFailure = table.Table.Columns["Failure"];
+            var colCancelled = table.Table.Columns["Cancelled"];
+            var colTotal = table.Table.Columns["Total Runs"];
+
+            table.Style.GetOrCreateColumnStyle(colDate).MinWidth =
+            table.Style.GetOrCreateColumnStyle(colDate).MaxWidth = 12;
+
+            table.Style.GetOrCreateColumnStyle(colSuccess).MinWidth =
+            table.Style.GetOrCreateColumnStyle(colSuccess).MaxWidth = 8;
+
+            table.Style.GetOrCreateColumnStyle(colFailure).MinWidth =
+            table.Style.GetOrCreateColumnStyle(colFailure).MaxWidth = 8;
+
+            table.Style.GetOrCreateColumnStyle(colCancelled).MinWidth =
+            table.Style.GetOrCreateColumnStyle(colCancelled).MaxWidth = 12;
+
+            table.Style.GetOrCreateColumnStyle(colTotal).MinWidth =
+            table.Style.GetOrCreateColumnStyle(colTotal).MaxWidth = 12;
+
+            table.Style.GetOrCreateColumnStyle(colSuccess).ColorGetter = (args) => new ColorScheme
+            {
+                Normal = Attribute.Make(Color.Green, Color.Black),
+                Focus = Attribute.Make(Color.BrightGreen, Color.DarkGray)
+            };
+
+            table.Style.GetOrCreateColumnStyle(colFailure).ColorGetter = (args) => new ColorScheme
+            {
+                Normal = Attribute.Make(Color.Red, Color.Black),
+                Focus = Attribute.Make(Color.BrightRed, Color.DarkGray)
+            };
+
+            table.Style.GetOrCreateColumnStyle(colCancelled).ColorGetter = (args) => new ColorScheme
+            {
+                Normal = Attribute.Make(Color.BrightYellow, Color.Black),
+                Focus = Attribute.Make(Color.BrightMagenta, Color.DarkGray)
+            };
+        }
     }
 }

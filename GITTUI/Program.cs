@@ -9,7 +9,8 @@ var token = Environment.GetEnvironmentVariable("GITHUB_TOKEN") ?? "";
 
 // 2. Setup Dependency Injection
 var serviceProvider = new ServiceCollection()
-    .AddSingleton(s => new GitHubService(token))
+    .AddSingleton<IGitHubService>(s => new GitHubService(token))
+    .AddSingleton<TaskProcessorFactory>()
     .AddSingleton<MainView>()
     .BuildServiceProvider();
 

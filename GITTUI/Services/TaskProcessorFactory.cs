@@ -1,18 +1,21 @@
 using System;
+using System.Collections.Concurrent;
 
 namespace GITTUI.Services
 {
-    internal static class TaskProcessorFactory
+    internal class TaskProcessorFactory
     {
-        public static ITaskProcessor GetProcessor(TaskType taskType)
+        private readonly ConcurrentDictionary<TaskType, ITaskProcessor> _processors = new();
+
+        public ITaskProcessor GetProcessor(TaskType taskType)
         {
-            return taskType switch
+            return _processors.GetOrAdd(taskType, type => type switch
             {
                 TaskType.Lightweight => new LightweightTaskProcessor(),
                 TaskType.Concurrent => new ConcurrentTaskProcessor(),
                 TaskType.Isolated => new IsolatedTaskProcessor(),
-                _ => throw new ArgumentException("Invalid task type")
-            };
+                _ => throw new ArgumentException($"Invalid task type: {type}")
+            });
         }
     }
 
