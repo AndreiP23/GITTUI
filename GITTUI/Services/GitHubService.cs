@@ -50,7 +50,9 @@ namespace GITTUI.Services
                 Status = Enum.TryParse<WorkflowStatus>(run.Status.StringValue, true, out var status) ? status : WorkflowStatus.Unknown,
                 Conclusion = Enum.TryParse<WorkflowConclusion>(run.Conclusion?.StringValue, true, out var conclusion) ? conclusion : WorkflowConclusion.Unknown,
                 CreatedAt = run.CreatedAt.DateTime,
-                Event = Enum.TryParse<WorkflowEvent>(run.Event, true, out var workflowEvent) ? workflowEvent : WorkflowEvent.Unknown
+                Event = Enum.TryParse<WorkflowEvent>(run.Event, true, out var workflowEvent) ? workflowEvent : WorkflowEvent.Unknown,
+                RunId = run.Id,
+                LogsUrl = run.HtmlUrl
             }).ToList();
         }
 
@@ -69,8 +71,16 @@ namespace GITTUI.Services
                 Status = Enum.TryParse<WorkflowStatus>(run.Status.StringValue, true, out var status) ? status : WorkflowStatus.Unknown,
                 Conclusion = Enum.TryParse<WorkflowConclusion>(run.Conclusion?.StringValue, true, out var conclusion) ? conclusion : WorkflowConclusion.Unknown,
                 CreatedAt = run.CreatedAt.DateTime,
-                Event = Enum.TryParse<WorkflowEvent>(run.Event, true, out var workflowEvent) ? workflowEvent : WorkflowEvent.Unknown
+                Event = Enum.TryParse<WorkflowEvent>(run.Event, true, out var workflowEvent) ? workflowEvent : WorkflowEvent.Unknown,
+                RunId = run.Id,
+                LogsUrl = run.HtmlUrl
             }).ToList();
+        }
+
+        public async Task<IReadOnlyList<WorkflowJob>> GetWorkflowRunJobsAsync(string owner, string repoName, long runId)
+        {
+            var response = await _client.Actions.Workflows.Jobs.List(owner, repoName, runId);
+            return response.Jobs;
         }
     }
 }

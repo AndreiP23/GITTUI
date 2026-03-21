@@ -39,26 +39,42 @@ namespace GITTUI.Components
 
         public static void ApplyActivityTableStyles(TableView table)
         {
-            if (table.Table == null || table.Table.Columns.Count < 4) return;
+            if (table.Table == null || table.Table.Columns.Count < 5) return;
 
             table.Style.ExpandLastColumn = false;
 
-            var colStat = table.Table.Columns["Stat"];
+            var colStat = table.Table.Columns["Status"];
             var colWork = table.Table.Columns["Workflow"];
             var colEvnt = table.Table.Columns["Event"];
             var colDate = table.Table.Columns["Date"];
+            var colLogs = table.Table.Columns["Logs"];
 
             table.Style.GetOrCreateColumnStyle(colStat).MinWidth =
-            table.Style.GetOrCreateColumnStyle(colStat).MaxWidth = 4;
+            table.Style.GetOrCreateColumnStyle(colStat).MaxWidth = 10;
 
             table.Style.GetOrCreateColumnStyle(colWork).MinWidth =
-            table.Style.GetOrCreateColumnStyle(colWork).MaxWidth = 14;
+            table.Style.GetOrCreateColumnStyle(colWork).MaxWidth = 30;
 
             table.Style.GetOrCreateColumnStyle(colEvnt).MinWidth =
             table.Style.GetOrCreateColumnStyle(colEvnt).MaxWidth = 10;
 
             table.Style.GetOrCreateColumnStyle(colDate).MinWidth =
             table.Style.GetOrCreateColumnStyle(colDate).MaxWidth = 16;
+
+            table.Style.GetOrCreateColumnStyle(colLogs).MinWidth =
+            table.Style.GetOrCreateColumnStyle(colLogs).MaxWidth = 12;
+
+            table.Style.GetOrCreateColumnStyle(colLogs).ColorGetter = (args) =>
+            {
+                var val = args.CellValue?.ToString();
+                if (!string.IsNullOrEmpty(val))
+                    return new ColorScheme
+                    {
+                        Normal = Attribute.Make(Color.BrightCyan, Color.Black),
+                        Focus = Attribute.Make(Color.White, Color.DarkGray)
+                    };
+                return null;
+            };
         }
 
         public static void ApplyGraphTableStyles(TableView table)

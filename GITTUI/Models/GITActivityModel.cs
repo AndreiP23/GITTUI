@@ -36,6 +36,10 @@
         public required WorkflowConclusion Conclusion { get; init; }
         public required DateTime CreatedAt { get; init; }
         public required WorkflowEvent Event { get; init; }
+        public long RunId { get; init; }
+        public string? LogsUrl { get; init; }
+
+        public bool HasLogs => !string.IsNullOrEmpty(LogsUrl);
 
         public string StatusIcon => StatusIconMapper.GetIcon(Status, Conclusion);
 

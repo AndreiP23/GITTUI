@@ -9,5 +9,6 @@ namespace GITTUI.Services
         Task<IReadOnlyList<Workflow>> GetWorkflowRunsAsync(string owner, string repoName);
         Task<List<GITActivityModel>> GetRepositoryActivityAsync(string owner, string repoName);
         Task<List<GITActivityModel>> GetRepositoryActivityAsync(string owner, string repoName, int days);
+        Task<IReadOnlyList<WorkflowJob>> GetWorkflowRunJobsAsync(string owner, string repoName, long runId);
     }
 }

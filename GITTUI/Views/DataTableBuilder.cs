@@ -22,10 +22,11 @@ namespace GITTUI.Views
         public static DataTable BuildActivityTable(IEnumerable<GITActivityModel> activities)
         {
             var dt = new DataTable();
-            dt.Columns.Add("Stat", typeof(string));
+            dt.Columns.Add("Status", typeof(string));
             dt.Columns.Add("Workflow", typeof(string));
             dt.Columns.Add("Event", typeof(string));
             dt.Columns.Add("Date", typeof(string));
+            dt.Columns.Add("Logs", typeof(string));
 
             foreach (var act in activities)
             {
@@ -33,7 +34,8 @@ namespace GITTUI.Views
                     act.StatusIcon,
                     act.WorkflowName,
                     act.Event.ToString().ToUpper(),
-                    act.CreatedAt.ToString("g")
+                    act.CreatedAt.ToString("g"),
+                    act.HasLogs ? "[View]" : ""
                 );
             }
 
