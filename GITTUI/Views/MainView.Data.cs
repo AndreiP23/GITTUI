@@ -101,7 +101,10 @@ namespace GITTUI.Views
 
                 Application.MainLoop.Invoke(() =>
                 {
-                    RunDetailDialog.Show(activity.WorkflowName, jobs);
+                    RunDetailDialog.Show(activity.WorkflowName, jobs, onRerunFailedJobs: () =>
+                    {
+                        RerunFailedJobs(repo.Owner, repo.Name, activity.RunId);
+                    });
                     _repoStatusItem.Title = $"Selected: {repo.Name}";
                     _statusBar.SetNeedsDisplay();
                 });
@@ -111,6 +114,116 @@ namespace GITTUI.Views
                 Application.MainLoop.Invoke(() =>
                 {
                     _repoStatusItem.Title = $"Failed to load details: {ex.Message}";
+                    _statusBar.SetNeedsDisplay();
+                });
+            }
+        }
+
+        private async void RerunFailedJobs(string owner, string repoName, long runId)
+        {
+            _repoStatusItem!.Title = "Rerunning failed jobs...";
+            _statusBar!.SetNeedsDisplay();
+
+            try
+            {
+                await _gitHubService.RerunFailedJobsAsync(owner, repoName, runId);
+
+                Application.MainLoop.Invoke(() =>
+                {
+                    _repoStatusItem.Title = "Rerun triggered successfully";
+                    _statusBar.SetNeedsDisplay();
+                });
+
+                var activities = await _gitHubService.GetRepositoryActivityAsync(owner, repoName);
+                _currentActivities.Clear();
+                _currentActivities.AddRange(activities);
+                UpdateActivityTable(activities);
+            }
+            catch (Exception ex)
+            {
+                Application.MainLoop.Invoke(() =>
+                {
+                    _repoStatusItem.Title = $"Rerun failed: {ex.Message}";
+                    _statusBar.SetNeedsDisplay();
+                });
+            }
+        }
+
+        private void OpenCreateWorkflowDialog()
+        {
+            if (_selectedRepo == null)
+            {
+                MessageBox.ErrorQuery("Error", "Select a repository first.", "Ok");
+                return;
+            }
+
+            var repo = _selectedRepo;
+
+            CreateWorkflowDialog.Show(repo.Name, (fileName, yamlContent) =>
+            {
+                CommitWorkflowFile(repo.Owner, repo.Name, fileName, yamlContent);
+            });
+        }
+
+        private async void CommitWorkflowFile(string owner, string repoName, string fileName, string yamlContent)
+        {
+            _repoStatusItem!.Title = $"Committing {fileName}...";
+            _statusBar!.SetNeedsDisplay();
+
+            try
+            {
+                var commitMessage = $"Create workflow {fileName}";
+                await _gitHubService.CreateWorkflowFileAsync(owner, repoName, fileName, yamlContent, commitMessage);
+
+                Application.MainLoop.Invoke(() =>
+                {
+                    _repoStatusItem.Title = $"Workflow {fileName} created successfully";
+                    _statusBar.SetNeedsDisplay();
+                });
+            }
+            catch (Exception ex)
+            {
+                Application.MainLoop.Invoke(() =>
+                {
+                    _repoStatusItem.Title = $"Failed to create workflow: {ex.Message}";
+                    _statusBar.SetNeedsDisplay();
+                });
+            }
+        }
+
+        private async void RunBenchmark()
+        {
+            if (_selectedRepo == null)
+            {
+                MessageBox.ErrorQuery("Error", "Select a repository first.", "Ok");
+                return;
+            }
+
+            var repo = _selectedRepo;
+
+            _repoStatusItem!.Title = "Running benchmark (3 passes)...";
+            _statusBar!.SetNeedsDisplay();
+
+            try
+            {
+                var benchmark = new TaskBenchmark(_processorFactory);
+                var result = await benchmark.RunAsync(async () =>
+                {
+                    await _gitHubService.GetRepositoryActivityAsync(repo.Owner, repo.Name);
+                });
+
+                Application.MainLoop.Invoke(() =>
+                {
+                    BenchmarkDialog.Show(result);
+                    _repoStatusItem.Title = $"Selected: {repo.Name}";
+                    _statusBar.SetNeedsDisplay();
+                });
+            }
+            catch (Exception ex)
+            {
+                Application.MainLoop.Invoke(() =>
+                {
+                    _repoStatusItem.Title = $"Benchmark failed: {ex.Message}";
                     _statusBar.SetNeedsDisplay();
                 });
             }

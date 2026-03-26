@@ -14,6 +14,10 @@ namespace GITTUI.Views
         private List<GITActivityModel> _currentActivities = new();
         private GITRepositoryModel? _selectedRepo;
 
+        private CancellationTokenSource? _repoSelectionCts;
+        private readonly object _debouncelock = new();
+        private const int DebounceDelayMs = 300;
+
         private ColorScheme? _blackScheme;
         private MenuBar? _menu;
         private TableViewWithFrame? _repoFrame;

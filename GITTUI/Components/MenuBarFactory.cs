@@ -5,7 +5,11 @@ namespace GITTUI.Components
 {
     internal static class MenuBarFactory
     {
-        public static MenuBar Create(Func<Task> refreshAction, Action quitAction)
+        public static MenuBar Create(
+            Func<Task> refreshAction,
+            Action quitAction,
+            Action? createWorkflowAction = null,
+            Action? benchmarkAction = null)
         {
             return new MenuBar(new[]
             {
@@ -13,6 +17,11 @@ namespace GITTUI.Components
                 {
                     new MenuItem("_Refresh", "Get latest data", async () => await refreshAction()),
                     new MenuItem("_Quit", "Exit Application", quitAction)
+                }),
+                new MenuBarItem("_Actions", new[]
+                {
+                    new MenuItem("_Create Workflow", "Create a new workflow file", () => createWorkflowAction?.Invoke()),
+                    new MenuItem("_Benchmark Processors", "Compare task processor performance", () => benchmarkAction?.Invoke())
                 })
             });
         }

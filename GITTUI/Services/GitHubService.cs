@@ -82,5 +82,17 @@ namespace GITTUI.Services
             var response = await _client.Actions.Workflows.Jobs.List(owner, repoName, runId);
             return response.Jobs;
         }
+
+        public async Task RerunFailedJobsAsync(string owner, string repoName, long runId)
+        {
+            await _client.Actions.Workflows.Runs.RerunFailedJobs(owner, repoName, runId);
+        }
+
+        public async Task CreateWorkflowFileAsync(string owner, string repoName, string fileName, string yamlContent, string commitMessage)
+        {
+            var path = $".github/workflows/{fileName}";
+            var request = new CreateFileRequest(commitMessage, yamlContent);
+            await _client.Repository.Content.CreateFile(owner, repoName, path, request);
+        }
     }
 }

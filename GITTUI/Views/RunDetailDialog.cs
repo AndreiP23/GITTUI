@@ -8,9 +8,12 @@ namespace GITTUI.Views
 {
     internal static class RunDetailDialog
     {
-        public static void Show(string workflowName, IReadOnlyList<WorkflowJob> jobs)
+        public static void Show(string workflowName, IReadOnlyList<WorkflowJob> jobs, Action? onRerunFailedJobs = null)
         {
             var title = Sanitize(workflowName);
+            var hasFailures = jobs.Any(j =>
+                string.Equals(j.Conclusion?.StringValue, "failure", StringComparison.OrdinalIgnoreCase));
+
             var dialog = new Dialog($" {title} ", 80, 24)
             {
                 ColorScheme = new ColorScheme
@@ -38,6 +41,18 @@ namespace GITTUI.Views
             closeButton.Clicked += () => Application.RequestStop();
 
             dialog.Add(textView);
+
+            if (hasFailures && onRerunFailedJobs != null)
+            {
+                var rerunButton = new Button("Rerun Failed Jobs");
+                rerunButton.Clicked += () =>
+                {
+                    Application.RequestStop();
+                    onRerunFailedJobs();
+                };
+                dialog.AddButton(rerunButton);
+            }
+
             dialog.AddButton(closeButton);
 
             Application.Run(dialog);

@@ -18,5 +18,15 @@ namespace GITTUI.Services
                 TaskScheduler.Default
             ).Unwrap();
         }
+
+        public async Task ProcessAsync(Func<CancellationToken, Task> taskFunc, CancellationToken cancellationToken)
+        {
+            await Task.Factory.StartNew(
+                () => taskFunc(cancellationToken),
+                cancellationToken,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default
+            ).Unwrap();
+        }
     }
 }

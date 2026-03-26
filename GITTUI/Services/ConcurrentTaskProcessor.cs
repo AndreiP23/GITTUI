@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
@@ -19,6 +20,11 @@ namespace GITTUI.Services
             await _taskChannel.Writer.WriteAsync(taskFunc);
         }
 
+        public async Task ProcessAsync(Func<CancellationToken, Task> taskFunc, CancellationToken cancellationToken)
+        {
+            await _taskChannel.Writer.WriteAsync(() => taskFunc(cancellationToken));
+        }
+
         public async ValueTask DisposeAsync()
         {
             _taskChannel.Writer.Complete();
@@ -32,6 +38,10 @@ namespace GITTUI.Services
                 try
                 {
                     await taskFunc();
+                }
+                catch (OperationCanceledException)
+                {
+                    // Task was cancelled, skip silently
                 }
                 catch (Exception ex)
                 {

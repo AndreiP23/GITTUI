@@ -6,7 +6,7 @@ namespace GITTUI.Views
     {
         private void WireEventHandlers()
         {
-            _repoTable!.SelectedCellChanged += async (args) =>
+            _repoTable!.SelectedCellChanged += (args) =>
             {
                 if (_allRepositories.Count == 0) return;
 
@@ -22,16 +22,8 @@ namespace GITTUI.Views
                     _statusBar!.SetNeedsDisplay();
                 });
 
-                try
-                {
-                    var activities = await _gitHubService.GetRepositoryActivityAsync(selectedRepo.Owner, selectedRepo.Name);
-                    _currentActivities = activities;
-                    Application.MainLoop.Invoke(() => UpdateActivityTable(activities));
-
-                    var history = await _gitHubService.GetRepositoryActivityAsync(selectedRepo.Owner, selectedRepo.Name, 14);
-                    Application.MainLoop.Invoke(() => UpdateGraphTable(history));
-                }
-                catch { }
+                // Cancel any previous in-flight request and debounce
+                DebouncedLoadRepoData(selectedRepo);
             };
 
             _activityTable!.CellActivated += (args) =>
@@ -51,6 +43,51 @@ namespace GITTUI.Views
                     args.Handled = true;
                 }
             };
+        }
+
+        private async void DebouncedLoadRepoData(Models.GITRepositoryModel repo)
+        {
+            // Cancel any previous pending request
+            CancellationTokenSource cts;
+            lock (_debouncelock)
+            {
+                _repoSelectionCts?.Cancel();
+                _repoSelectionCts = new CancellationTokenSource();
+                cts = _repoSelectionCts;
+            }
+
+            try
+            {
+                // Debounce: wait before firing API calls
+                await Task.Delay(DebounceDelayMs, cts.Token);
+
+                // Parallel loading: fetch activity + history at the same time
+                var activityTask = _gitHubService.GetRepositoryActivityAsync(repo.Owner, repo.Name);
+                var historyTask = _gitHubService.GetRepositoryActivityAsync(repo.Owner, repo.Name, 14);
+
+                await Task.WhenAll(activityTask, historyTask);
+
+                cts.Token.ThrowIfCancellationRequested();
+
+                var activities = activityTask.Result;
+                var history = historyTask.Result;
+
+                _currentActivities = activities;
+
+                Application.MainLoop.Invoke(() =>
+                {
+                    UpdateActivityTable(activities);
+                    UpdateGraphTable(history);
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                // User moved to another repo before debounce finished — expected
+            }
+            catch
+            {
+                // API error — silently ignore like before
+            }
         }
     }
 }

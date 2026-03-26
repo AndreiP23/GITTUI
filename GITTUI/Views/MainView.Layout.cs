@@ -34,7 +34,9 @@ namespace GITTUI.Views
 
             _menu = MenuBarFactory.Create(
                 refreshAction: () => LoadReposAsync(),
-                quitAction: () => Application.RequestStop()
+                quitAction: () => Application.RequestStop(),
+                createWorkflowAction: () => OpenCreateWorkflowDialog(),
+                benchmarkAction: () => RunBenchmark()
             );
         }
 
