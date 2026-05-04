@@ -38,22 +38,12 @@ namespace GITTUI.Services
             var workflowRequest = new WorkflowRunsRequest();
             var options = new ApiOptions
             {
-                PageSize = 30,
+                PageSize = 100,
                 PageCount = 1
             };
 
             var response = await _client.Actions.Workflows.Runs.List(owner, repoName, workflowRequest, options);
-
-            return response.WorkflowRuns.Select(run => new GITActivityModel
-            {
-                WorkflowName = run.Name,
-                Status = Enum.TryParse<WorkflowStatus>(run.Status.StringValue, true, out var status) ? status : WorkflowStatus.Unknown,
-                Conclusion = Enum.TryParse<WorkflowConclusion>(run.Conclusion?.StringValue, true, out var conclusion) ? conclusion : WorkflowConclusion.Unknown,
-                CreatedAt = run.CreatedAt.DateTime,
-                Event = Enum.TryParse<WorkflowEvent>(run.Event, true, out var workflowEvent) ? workflowEvent : WorkflowEvent.Unknown,
-                RunId = run.Id,
-                LogsUrl = run.HtmlUrl
-            }).ToList();
+            return MapWorkflowRuns(response.WorkflowRuns);
         }
 
         public async Task<List<GITActivityModel>> GetRepositoryActivityAsync(string owner, string repoName, int days)
@@ -64,8 +54,12 @@ namespace GITTUI.Services
             };
 
             var response = await _client.Actions.Workflows.Runs.List(owner, repoName, workflowRequest);
+            return MapWorkflowRuns(response.WorkflowRuns);
+        }
 
-            return response.WorkflowRuns.Select(run => new GITActivityModel
+        private static List<GITActivityModel> MapWorkflowRuns(IReadOnlyList<WorkflowRun> runs)
+        {
+            return runs.Select(run => new GITActivityModel
             {
                 WorkflowName = run.Name,
                 Status = Enum.TryParse<WorkflowStatus>(run.Status.StringValue, true, out var status) ? status : WorkflowStatus.Unknown,

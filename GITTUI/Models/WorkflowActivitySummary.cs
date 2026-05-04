@@ -2,10 +2,10 @@ namespace GITTUI.Models
 {
     public class WorkflowActivitySummary
     {
-        public DateTime Date { get; set; }
-        public int SuccessCount { get; set; }
-        public int FailureCount { get; set; }
-        public int CancelledCount { get; set; }
-        public int TotalRuns { get; set; }
+        public required DateTime Date { get; init; }
+        public required int SuccessCount { get; init; }
+        public required int FailureCount { get; init; }
+        public required int CancelledCount { get; init; }
+        public required int TotalRuns { get; init; }
     }
 }

@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 
 namespace GITTUI.Services
 {
-    internal class TaskProcessorFactory
+    internal class TaskProcessorFactory : IAsyncDisposable
     {
         private readonly ConcurrentDictionary<TaskType, ITaskProcessor> _processors = new();
 
@@ -16,6 +16,16 @@ namespace GITTUI.Services
                 TaskType.Isolated => new IsolatedTaskProcessor(),
                 _ => throw new ArgumentException($"Invalid task type: {type}")
             });
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            foreach (var processor in _processors.Values)
+            {
+                if (processor is IAsyncDisposable asyncDisposable)
+                    await asyncDisposable.DisposeAsync();
+            }
+            _processors.Clear();
         }
     }
 

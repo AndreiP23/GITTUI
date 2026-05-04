@@ -58,7 +58,17 @@ namespace GITTUI.Views
                     return;
                 }
 
-                if (!fileName.EndsWith(".yml") && !fileName.EndsWith(".yaml"))
+                // Reject path traversal and invalid filesystem characters
+                if (fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+                    || fileName.Contains("..")
+                    || fileName.Contains('/') || fileName.Contains('\\'))
+                {
+                    MessageBox.ErrorQuery("Error", "Filename contains invalid characters.", "Ok");
+                    return;
+                }
+
+                if (!fileName.EndsWith(".yml", StringComparison.OrdinalIgnoreCase)
+                    && !fileName.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase))
                     fileName += ".yml";
 
                 if (string.IsNullOrWhiteSpace(yaml))

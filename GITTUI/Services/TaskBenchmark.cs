@@ -5,6 +5,8 @@ namespace GITTUI.Services
     internal class TaskBenchmark
     {
         private readonly TaskProcessorFactory _factory;
+        private const int WarmupRuns = 1;
+        private const int MeasuredRuns = 5;
 
         public TaskBenchmark(TaskProcessorFactory factory)
         {
@@ -13,26 +15,57 @@ namespace GITTUI.Services
 
         public async Task<BenchmarkResult> RunAsync(Func<Task> workload)
         {
-            var lightweightMs = await MeasureAsync(TaskType.Lightweight, workload);
-            var concurrentMs = await MeasureAsync(TaskType.Concurrent, workload);
-            var isolatedMs = await MeasureAsync(TaskType.Isolated, workload);
+            var lightweight = await MeasureAsync(TaskType.Lightweight, workload);
+            var concurrent = await MeasureAsync(TaskType.Concurrent, workload);
+            var isolated = await MeasureAsync(TaskType.Isolated, workload);
 
-            return new BenchmarkResult(lightweightMs, concurrentMs, isolatedMs);
+            return new BenchmarkResult(lightweight, concurrent, isolated);
         }
 
-        private async Task<long> MeasureAsync(TaskType type, Func<Task> workload)
+        private async Task<BenchmarkTimings> MeasureAsync(TaskType type, Func<Task> workload)
         {
             var processor = _factory.GetProcessor(type);
-            var sw = Stopwatch.StartNew();
-            await processor.ProcessAsync(workload);
-            sw.Stop();
-            return sw.ElapsedMilliseconds;
+
+            // Warmup — let JIT compile without affecting measurements
+            for (int i = 0; i < WarmupRuns; i++)
+                await processor.ProcessAsync(workload);
+
+            var timings = new long[MeasuredRuns];
+            for (int i = 0; i < MeasuredRuns; i++)
+            {
+                var sw = Stopwatch.StartNew();
+                await processor.ProcessAsync(workload);
+                sw.Stop();
+                timings[i] = sw.ElapsedMilliseconds;
+            }
+
+            return new BenchmarkTimings(timings);
         }
     }
 
-    internal record BenchmarkResult(long LightweightMs, long ConcurrentMs, long IsolatedMs)
+    internal record BenchmarkTimings
+    {
+        public long Min { get; }
+        public long Max { get; }
+        public double Mean { get; }
+        public long Median { get; }
+
+        public BenchmarkTimings(long[] samples)
+        {
+            Array.Sort(samples);
+            Min = samples[0];
+            Max = samples[^1];
+            Mean = samples.Average();
+            Median = samples[samples.Length / 2];
+        }
+
+        public override string ToString() =>
+            $"Mean: {Mean:F0}ms | Median: {Median}ms | Min: {Min}ms | Max: {Max}ms";
+    }
+
+    internal record BenchmarkResult(BenchmarkTimings Lightweight, BenchmarkTimings Concurrent, BenchmarkTimings Isolated)
     {
         public override string ToString() =>
-            $"Lightweight: {LightweightMs}ms | Concurrent: {ConcurrentMs}ms | Isolated: {IsolatedMs}ms";
+            $"Lightweight: {Lightweight}\nConcurrent:  {Concurrent}\nIsolated:    {Isolated}";
     }
 }

@@ -46,13 +46,27 @@ namespace GITTUI.Views
         {
             var summaries = intervalActivities
                 .GroupBy(a => a.CreatedAt.Date)
-                .Select(g => new WorkflowActivitySummary
+                .Select(g =>
                 {
-                    Date = g.Key,
-                    SuccessCount = g.Count(a => a.Conclusion == WorkflowConclusion.Success),
-                    FailureCount = g.Count(a => a.Conclusion == WorkflowConclusion.Failure),
-                    CancelledCount = g.Count(a => a.Conclusion == WorkflowConclusion.Cancelled),
-                    TotalRuns = g.Count()
+                    int success = 0, failure = 0, cancelled = 0, total = 0;
+                    foreach (var a in g)
+                    {
+                        total++;
+                        switch (a.Conclusion)
+                        {
+                            case WorkflowConclusion.Success: success++; break;
+                            case WorkflowConclusion.Failure: failure++; break;
+                            case WorkflowConclusion.Cancelled: cancelled++; break;
+                        }
+                    }
+                    return new WorkflowActivitySummary
+                    {
+                        Date = g.Key,
+                        SuccessCount = success,
+                        FailureCount = failure,
+                        CancelledCount = cancelled,
+                        TotalRuns = total
+                    };
                 })
                 .OrderBy(s => s.Date)
                 .ToList();

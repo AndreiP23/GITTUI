@@ -8,7 +8,7 @@ namespace GITTUI.Views
     {
         public static void Show(BenchmarkResult result)
         {
-            var dialog = new Dialog(" Processor Benchmark ", 60, 14)
+            var dialog = new Dialog(" Processor Benchmark ", 70, 18)
             {
                 ColorScheme = new ColorScheme
                 {
@@ -19,11 +19,14 @@ namespace GITTUI.Views
                 }
             };
 
+            static string Fmt(BenchmarkTimings t) =>
+                $"Mean {t.Mean,6:F0}ms | Med {t.Median,5}ms | Min {t.Min,5}ms | Max {t.Max,5}ms";
+
             var text = new Label(
-                $"  Lightweight (Task.Run):      {result.LightweightMs,6} ms\n" +
-                $"  Concurrent  (Channel):       {result.ConcurrentMs,6} ms\n" +
-                $"  Isolated    (LongRunning):   {result.IsolatedMs,6} ms\n\n" +
-                $"  Each processor ran the same workload (fetch repos).\n" +
+                $"  Lightweight (Task.Run):\n    {Fmt(result.Lightweight)}\n" +
+                $"  Concurrent  (Channel):\n    {Fmt(result.Concurrent)}\n" +
+                $"  Isolated    (LongRunning):\n    {Fmt(result.Isolated)}\n\n" +
+                $"  5 measured runs per processor (1 warmup).\n" +
                 $"  Lower is better.")
             {
                 X = 1,

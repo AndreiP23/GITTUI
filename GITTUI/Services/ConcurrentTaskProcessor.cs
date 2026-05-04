@@ -7,7 +7,8 @@ namespace GITTUI.Services
 {
     internal class ConcurrentTaskProcessor : ITaskProcessor, IAsyncDisposable
     {
-        private readonly Channel<Func<Task>> _taskChannel = Channel.CreateUnbounded<Func<Task>>();
+        private readonly Channel<Func<Task>> _taskChannel = Channel.CreateBounded<Func<Task>>(
+            new BoundedChannelOptions(64) { FullMode = BoundedChannelFullMode.Wait });
         private readonly Task _workerTask;
 
         public ConcurrentTaskProcessor()

@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "GITTUI",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/GITTUI/bin/Debug/net9.0/GITTUI.dll",
+            "args": ["--token", "${env:GITHUB_TOKEN}"],
+            "cwd": "${workspaceFolder}/GITTUI",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
+        }
+    ]
+}

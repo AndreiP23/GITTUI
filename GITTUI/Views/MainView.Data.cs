@@ -53,8 +53,9 @@ namespace GITTUI.Views
                 }
                 catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[LoadReposAsync] {ex}");
                     Application.MainLoop.Invoke(() =>
-                        MessageBox.ErrorQuery("Error", $"Could not load repos: {ex.Message}", "Ok"));
+                        MessageBox.ErrorQuery("Error", "Could not load repositories. Check your token and network.", "Ok"));
                 }
             });
         }
@@ -111,9 +112,10 @@ namespace GITTUI.Views
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ShowRunDetails] {ex}");
                 Application.MainLoop.Invoke(() =>
                 {
-                    _repoStatusItem.Title = $"Failed to load details: {ex.Message}";
+                    _repoStatusItem.Title = "Failed to load run details";
                     _statusBar.SetNeedsDisplay();
                 });
             }
@@ -135,15 +137,16 @@ namespace GITTUI.Views
                 });
 
                 var activities = await _gitHubService.GetRepositoryActivityAsync(owner, repoName);
-                _currentActivities.Clear();
-                _currentActivities.AddRange(activities);
+                // Atomic swap for thread safety
+                _currentActivities = activities;
                 UpdateActivityTable(activities);
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[RerunFailedJobs] {ex}");
                 Application.MainLoop.Invoke(() =>
                 {
-                    _repoStatusItem.Title = $"Rerun failed: {ex.Message}";
+                    _repoStatusItem.Title = "Rerun failed";
                     _statusBar.SetNeedsDisplay();
                 });
             }
@@ -183,9 +186,10 @@ namespace GITTUI.Views
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[CommitWorkflowFile] {ex}");
                 Application.MainLoop.Invoke(() =>
                 {
-                    _repoStatusItem.Title = $"Failed to create workflow: {ex.Message}";
+                    _repoStatusItem.Title = "Failed to create workflow";
                     _statusBar.SetNeedsDisplay();
                 });
             }
@@ -221,9 +225,10 @@ namespace GITTUI.Views
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[RunBenchmark] {ex}");
                 Application.MainLoop.Invoke(() =>
                 {
-                    _repoStatusItem.Title = $"Benchmark failed: {ex.Message}";
+                    _repoStatusItem.Title = "Benchmark failed";
                     _statusBar.SetNeedsDisplay();
                 });
             }

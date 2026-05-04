@@ -52,6 +52,7 @@ namespace GITTUI.Views
             lock (_debouncelock)
             {
                 _repoSelectionCts?.Cancel();
+                _repoSelectionCts?.Dispose();
                 _repoSelectionCts = new CancellationTokenSource();
                 cts = _repoSelectionCts;
             }
@@ -72,6 +73,7 @@ namespace GITTUI.Views
                 var activities = activityTask.Result;
                 var history = historyTask.Result;
 
+                // Atomic swap — safe for concurrent readers
                 _currentActivities = activities;
 
                 Application.MainLoop.Invoke(() =>
@@ -84,9 +86,14 @@ namespace GITTUI.Views
             {
                 // User moved to another repo before debounce finished — expected
             }
-            catch
+            catch (Exception ex)
             {
-                // API error — silently ignore like before
+                System.Diagnostics.Debug.WriteLine($"[DebouncedLoadRepoData] API error: {ex.Message}");
+                Application.MainLoop.Invoke(() =>
+                {
+                    _repoStatusItem!.Title = "Failed to load repository data";
+                    _statusBar!.SetNeedsDisplay();
+                });
             }
         }
     }

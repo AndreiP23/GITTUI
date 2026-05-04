@@ -30,10 +30,15 @@ return 0;
 static string? ResolveToken(string[] args)
 {
     // Priority 1: --token command-line argument
-    for (int i = 0; i < args.Length - 1; i++)
+    for (int i = 0; i < args.Length; i++)
     {
         if (args[i].Equals("--token", StringComparison.OrdinalIgnoreCase))
-            return args[i + 1];
+        {
+            if (i + 1 < args.Length)
+                return args[i + 1];
+            Console.Error.WriteLine("Error: --token requires a value.");
+            return null;
+        }
     }
 
     // Priority 2: existing GITHUB_TOKEN environment variable
