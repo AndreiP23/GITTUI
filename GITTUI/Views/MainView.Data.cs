@@ -1,6 +1,7 @@
 using GITTUI.Components;
 using GITTUI.Models;
 using GITTUI.Services;
+using Microsoft.Extensions.Logging;
 using Terminal.Gui;
 
 namespace GITTUI.Views
@@ -9,6 +10,8 @@ namespace GITTUI.Views
     {
         private async void RefreshAllData()
         {
+            _cacheInvalidator.InvalidateAll();
+
             _repoStatusItem!.Title = "Refreshing data...";
             _statusBar!.SetNeedsDisplay();
 
@@ -53,7 +56,7 @@ namespace GITTUI.Views
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[LoadReposAsync] {ex}");
+                    _logger.LogError(ex, "[LoadReposAsync] Failed to load repositories");
                     Application.MainLoop.Invoke(() =>
                         MessageBox.ErrorQuery("Error", "Could not load repositories. Check your token and network.", "Ok"));
                 }
@@ -112,7 +115,7 @@ namespace GITTUI.Views
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ShowRunDetails] {ex}");
+                _logger.LogError(ex, "[ShowRunDetails] Failed to load run details for run {RunId}", activity.RunId);
                 Application.MainLoop.Invoke(() =>
                 {
                     _repoStatusItem.Title = "Failed to load run details";
@@ -143,7 +146,7 @@ namespace GITTUI.Views
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[RerunFailedJobs] {ex}");
+                _logger.LogError(ex, "[RerunFailedJobs] Failed to rerun jobs for run {RunId}", runId);
                 Application.MainLoop.Invoke(() =>
                 {
                     _repoStatusItem.Title = "Rerun failed";
@@ -186,7 +189,7 @@ namespace GITTUI.Views
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[CommitWorkflowFile] {ex}");
+                _logger.LogError(ex, "[CommitWorkflowFile] Failed to create workflow {FileName}", fileName);
                 Application.MainLoop.Invoke(() =>
                 {
                     _repoStatusItem.Title = "Failed to create workflow";
@@ -225,7 +228,7 @@ namespace GITTUI.Views
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[RunBenchmark] {ex}");
+                _logger.LogError(ex, "[RunBenchmark] Benchmark failed for {RepoName}", repo.Name);
                 Application.MainLoop.Invoke(() =>
                 {
                     _repoStatusItem.Title = "Benchmark failed";

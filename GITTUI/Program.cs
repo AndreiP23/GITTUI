@@ -1,7 +1,12 @@
 ﻿using DotNetEnv;
 using GITTUI.Services;
 using GITTUI.Views;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Serilog;
 
 // 1. Resolve token: --token arg > GITHUB_TOKEN env var > .env file
 var token = ResolveToken(args);
@@ -15,16 +20,53 @@ if (string.IsNullOrWhiteSpace(token))
     return 1;
 }
 
-// 2. Setup Dependency Injection
-var serviceProvider = new ServiceCollection()
-    .AddSingleton<IGitHubService>(s => new GitHubService(token))
-    .AddSingleton<TaskProcessorFactory>()
-    .AddSingleton<MainView>()
-    .BuildServiceProvider();
+// 2. Build the Generic Host (config, logging, DI, background services)
+var host = Host.CreateDefaultBuilder(Array.Empty<string>())
+    .UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration))
+    .ConfigureServices((ctx, services) =>
+    {
+        // Strongly-typed option sections
+        services.Configure<GitHubOptions>(ctx.Configuration.GetSection(GitHubOptions.Section));
+        services.Configure<CacheOptions>(ctx.Configuration.GetSection(CacheOptions.Section));
+        services.Configure<AutoRefreshOptions>(ctx.Configuration.GetSection(AutoRefreshOptions.Section));
 
-// 3. Start the Application
-var mainView = serviceProvider.GetRequiredService<MainView>();
+        // Caching
+        services.AddMemoryCache();
+
+        // GitHub service: real implementation wrapped by a caching decorator
+        services.AddSingleton<GitHubService>(s => new GitHubService(
+            token,
+            s.GetRequiredService<ILogger<GitHubService>>(),
+            s.GetRequiredService<IOptions<GitHubOptions>>()));
+
+        services.AddSingleton<CachingGitHubService>(s => new CachingGitHubService(
+            s.GetRequiredService<GitHubService>(),
+            s.GetRequiredService<IMemoryCache>(),
+            s.GetRequiredService<ILogger<CachingGitHubService>>(),
+            s.GetRequiredService<IOptions<CacheOptions>>()));
+
+        // Both IGitHubService and ICacheInvalidator resolve to the same singleton decorator
+        services.AddSingleton<IGitHubService>(s => s.GetRequiredService<CachingGitHubService>());
+        services.AddSingleton<ICacheInvalidator>(s => s.GetRequiredService<CachingGitHubService>());
+
+        services.AddSingleton<TaskProcessorFactory>();
+
+        // AutoRefreshService registered as both a singleton (for injection into MainView)
+        // and a hosted service so the generic host manages its lifetime.
+        services.AddSingleton<AutoRefreshService>();
+        services.AddHostedService(s => s.GetRequiredService<AutoRefreshService>());
+
+        services.AddSingleton<MainView>();
+    })
+    .Build();
+
+// 3. Start background services, then run the TUI on the main thread
+await host.StartAsync();
+
+var mainView = host.Services.GetRequiredService<MainView>();
 mainView.Run();
+
+await host.StopAsync();
 return 0;
 
 static string? ResolveToken(string[] args)

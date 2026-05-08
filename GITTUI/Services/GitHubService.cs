@@ -1,4 +1,6 @@
 ﻿using GITTUI.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Octokit;
 
 namespace GITTUI.Services
@@ -6,15 +8,20 @@ namespace GITTUI.Services
     internal class GitHubService : IGitHubService
     {
         private readonly GitHubClient _client;
+        private readonly ILogger<GitHubService> _logger;
+        private readonly GitHubOptions _options;
 
-        public GitHubService(string token)
+        public GitHubService(string token, ILogger<GitHubService> logger, IOptions<GitHubOptions> options)
         {
             _client = new GitHubClient(new ProductHeaderValue("Monitor"));
             _client.Credentials = new Credentials(token);
+            _logger = logger;
+            _options = options.Value;
         }
 
         public async Task<List<GITRepositoryModel>> GetRepositoriesAsync()
         {
+            _logger.LogDebug("Calling GitHub API: GetAllForCurrent");
             var octoRepos = await _client.Repository.GetAllForCurrent();
 
             if (octoRepos == null) throw new Exception("GitHub API returned no data.");
@@ -38,8 +45,8 @@ namespace GITTUI.Services
             var workflowRequest = new WorkflowRunsRequest();
             var options = new ApiOptions
             {
-                PageSize = 100,
-                PageCount = 1
+                PageSize = _options.PageSize,
+                PageCount = _options.PageCount
             };
 
             var response = await _client.Actions.Workflows.Runs.List(owner, repoName, workflowRequest, options);

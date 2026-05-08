@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Terminal.Gui;
 
 namespace GITTUI.Views
@@ -60,11 +61,11 @@ namespace GITTUI.Views
             try
             {
                 // Debounce: wait before firing API calls
-                await Task.Delay(DebounceDelayMs, cts.Token);
+                await Task.Delay(_githubOptions.DebounceDelayMs, cts.Token);
 
                 // Parallel loading: fetch activity + history at the same time
                 var activityTask = _gitHubService.GetRepositoryActivityAsync(repo.Owner, repo.Name);
-                var historyTask = _gitHubService.GetRepositoryActivityAsync(repo.Owner, repo.Name, 14);
+                var historyTask = _gitHubService.GetRepositoryActivityAsync(repo.Owner, repo.Name, _githubOptions.HistoryDays);
 
                 await Task.WhenAll(activityTask, historyTask);
 
@@ -88,7 +89,7 @@ namespace GITTUI.Views
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[DebouncedLoadRepoData] API error: {ex.Message}");
+                _logger.LogError(ex, "[DebouncedLoadRepoData] API error for {RepoName}", repo.Name);
                 Application.MainLoop.Invoke(() =>
                 {
                     _repoStatusItem!.Title = "Failed to load repository data";
