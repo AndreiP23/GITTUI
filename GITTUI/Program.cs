@@ -8,15 +8,20 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Serilog;
 
-// 1. Resolve token: --token arg > GITHUB_TOKEN env var > .env file
+// 1. Parse CLI flags
+var useMock = args.Any(a => a.Equals("--mock", StringComparison.OrdinalIgnoreCase));
+var mockDelayMs = ResolveMockDelayMs(args) ?? 50;
+
+// Token only required when hitting the real GitHub API
 var token = ResolveToken(args);
 
-if (string.IsNullOrWhiteSpace(token))
+if (!useMock && string.IsNullOrWhiteSpace(token))
 {
     Console.Error.WriteLine("No GitHub token provided.");
     Console.Error.WriteLine("Usage:  GITTUI --token <your-token>");
     Console.Error.WriteLine("   or:  set GITHUB_TOKEN=<your-token> then run GITTUI");
     Console.Error.WriteLine("   or:  create a .env file with GITHUB_TOKEN=<your-token>");
+    Console.Error.WriteLine("   or:  GITTUI --mock [--mock-delay <ms>]   (run with deterministic in-memory data)");
     return 1;
 }
 
@@ -32,24 +37,37 @@ var host = Host.CreateDefaultBuilder(Array.Empty<string>())
 
         // Caching
         services.AddMemoryCache();
+        services.AddSingleton<MetricsService>();
+        services.AddSingleton<MetricsExportService>();
+        services.AddSingleton<RuntimeSettingsService>();
 
-        // GitHub service: real implementation wrapped by a caching decorator
-        services.AddSingleton<GitHubService>(s => new GitHubService(
-            token,
-            s.GetRequiredService<ILogger<GitHubService>>(),
-            s.GetRequiredService<IOptions<GitHubOptions>>()));
+        // GitHub service: real or mock implementation wrapped by a caching decorator
+        services.AddSingleton<CachingGitHubService>(s =>
+        {
+            IGitHubService inner = useMock
+                ? new MockGitHubService(
+                    s.GetRequiredService<MetricsService>(),
+                    TimeSpan.FromMilliseconds(mockDelayMs))
+                : new GitHubService(
+                    token!,
+                    s.GetRequiredService<ILogger<GitHubService>>(),
+                    s.GetRequiredService<IOptions<GitHubOptions>>(),
+                    s.GetRequiredService<MetricsService>());
 
-        services.AddSingleton<CachingGitHubService>(s => new CachingGitHubService(
-            s.GetRequiredService<GitHubService>(),
-            s.GetRequiredService<IMemoryCache>(),
-            s.GetRequiredService<ILogger<CachingGitHubService>>(),
-            s.GetRequiredService<IOptions<CacheOptions>>()));
+            return new CachingGitHubService(
+                inner,
+                s.GetRequiredService<IMemoryCache>(),
+                s.GetRequiredService<ILogger<CachingGitHubService>>(),
+                s.GetRequiredService<MetricsService>(),
+                s.GetRequiredService<RuntimeSettingsService>());
+        });
 
         // Both IGitHubService and ICacheInvalidator resolve to the same singleton decorator
         services.AddSingleton<IGitHubService>(s => s.GetRequiredService<CachingGitHubService>());
         services.AddSingleton<ICacheInvalidator>(s => s.GetRequiredService<CachingGitHubService>());
 
         services.AddSingleton<TaskProcessorFactory>();
+        services.AddSingleton<ExperimentRunner>();
 
         // AutoRefreshService registered as both a singleton (for injection into MainView)
         // and a hosted service so the generic host manages its lifetime.
@@ -95,5 +113,19 @@ static string? ResolveToken(string[] args)
         return Environment.GetEnvironmentVariable("GITHUB_TOKEN");
     }
 
+    return null;
+}
+
+static int? ResolveMockDelayMs(string[] args)
+{
+    for (int i = 0; i < args.Length - 1; i++)
+    {
+        if (args[i].Equals("--mock-delay", StringComparison.OrdinalIgnoreCase)
+            && int.TryParse(args[i + 1], out var ms)
+            && ms >= 0)
+        {
+            return ms;
+        }
+    }
     return null;
 }

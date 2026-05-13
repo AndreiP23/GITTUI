@@ -7,13 +7,15 @@ namespace GITTUI.Services
     internal sealed class AutoRefreshService : BackgroundService
     {
         private readonly ILogger<AutoRefreshService> _logger;
-        private readonly AutoRefreshOptions _options;
+        private readonly MetricsService _metrics;
+        private readonly RuntimeSettingsService _runtimeSettings;
         private Action? _refreshCallback;
 
-        public AutoRefreshService(ILogger<AutoRefreshService> logger, IOptions<AutoRefreshOptions> options)
+        public AutoRefreshService(ILogger<AutoRefreshService> logger, RuntimeSettingsService runtimeSettings, MetricsService metrics)
         {
             _logger = logger;
-            _options = options.Value;
+            _runtimeSettings = runtimeSettings;
+            _metrics = metrics;
         }
 
         /// <summary>
@@ -23,20 +25,22 @@ namespace GITTUI.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            if (!_options.Enabled)
-            {
-                _logger.LogInformation("Auto-refresh is disabled");
-                return;
-            }
-
-            _logger.LogInformation("Auto-refresh started. Interval: {Seconds}s", _options.IntervalSeconds);
+            _logger.LogInformation("Auto-refresh service started");
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(_options.IntervalSeconds), stoppingToken);
+                    var settings = _runtimeSettings.GetSnapshot();
+                    if (!settings.AutoRefreshEnabled)
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+                        continue;
+                    }
+
+                    await Task.Delay(TimeSpan.FromSeconds(settings.AutoRefreshIntervalSeconds), stoppingToken);
                     _logger.LogInformation("Auto-refresh triggered");
+                    _metrics.RecordAutoRefresh();
                     _refreshCallback?.Invoke();
                 }
                 catch (OperationCanceledException)

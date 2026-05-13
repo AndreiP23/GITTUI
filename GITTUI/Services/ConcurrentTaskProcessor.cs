@@ -7,7 +7,7 @@ namespace GITTUI.Services
 {
     internal class ConcurrentTaskProcessor : ITaskProcessor, IAsyncDisposable
     {
-        private readonly Channel<Func<Task>> _taskChannel = Channel.CreateBounded<Func<Task>>(
+        private readonly Channel<QueuedTask> _taskChannel = Channel.CreateBounded<QueuedTask>(
             new BoundedChannelOptions(64) { FullMode = BoundedChannelFullMode.Wait });
         private readonly Task _workerTask;
 
@@ -18,12 +18,19 @@ namespace GITTUI.Services
 
         public async Task ProcessAsync(Func<Task> taskFunc)
         {
-            await _taskChannel.Writer.WriteAsync(taskFunc);
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            await _taskChannel.Writer.WriteAsync(new QueuedTask(
+                ExecuteAsync: _ => taskFunc(),
+                CancellationToken: CancellationToken.None,
+                Completion: completion));
+            await completion.Task;
         }
 
         public async Task ProcessAsync(Func<CancellationToken, Task> taskFunc, CancellationToken cancellationToken)
         {
-            await _taskChannel.Writer.WriteAsync(() => taskFunc(cancellationToken));
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            await _taskChannel.Writer.WriteAsync(new QueuedTask(taskFunc, cancellationToken, completion), cancellationToken);
+            await completion.Task.WaitAsync(cancellationToken);
         }
 
         public async ValueTask DisposeAsync()
@@ -34,21 +41,28 @@ namespace GITTUI.Services
 
         private async Task ProcessTasksAsync()
         {
-            await foreach (var taskFunc in _taskChannel.Reader.ReadAllAsync())
+            await foreach (var queuedTask in _taskChannel.Reader.ReadAllAsync())
             {
                 try
                 {
-                    await taskFunc();
+                    queuedTask.CancellationToken.ThrowIfCancellationRequested();
+                    await queuedTask.ExecuteAsync(queuedTask.CancellationToken);
+                    queuedTask.Completion.SetResult();
                 }
                 catch (OperationCanceledException)
                 {
-                    // Task was cancelled, skip silently
+                    queuedTask.Completion.SetCanceled();
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Task failed: {ex.Message}");
+                    queuedTask.Completion.SetException(ex);
                 }
             }
         }
+
+        private sealed record QueuedTask(
+            Func<CancellationToken, Task> ExecuteAsync,
+            CancellationToken CancellationToken,
+            TaskCompletionSource Completion);
     }
 }

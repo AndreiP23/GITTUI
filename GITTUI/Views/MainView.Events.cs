@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using Terminal.Gui;
+using GITTUI.Models;
 
 namespace GITTUI.Views
 {
@@ -53,39 +55,78 @@ namespace GITTUI.Views
             lock (_debouncelock)
             {
                 _repoSelectionCts?.Cancel();
-                _repoSelectionCts?.Dispose();
                 _repoSelectionCts = new CancellationTokenSource();
                 cts = _repoSelectionCts;
             }
 
+            var token = cts.Token;
+            var startedLoading = false;
+            var uiLatencyWatch = Stopwatch.StartNew();
+
             try
             {
+                var settings = _runtimeSettings.GetSnapshot();
+
                 // Debounce: wait before firing API calls
-                await Task.Delay(_githubOptions.DebounceDelayMs, cts.Token);
+                await Task.Delay(settings.DebounceDelayMs, token);
 
-                // Parallel loading: fetch activity + history at the same time
-                var activityTask = _gitHubService.GetRepositoryActivityAsync(repo.Owner, repo.Name);
-                var historyTask = _gitHubService.GetRepositoryActivityAsync(repo.Owner, repo.Name, _githubOptions.HistoryDays);
+                // Only allow one repo-data load at a time so quick navigation
+                // doesn't fan out multiple overlapping API calls.
+                await _repoDataLoadGate.WaitAsync(token);
 
-                await Task.WhenAll(activityTask, historyTask);
-
-                cts.Token.ThrowIfCancellationRequested();
-
-                var activities = activityTask.Result;
-                var history = historyTask.Result;
-
-                // Atomic swap — safe for concurrent readers
-                _currentActivities = activities;
-
-                Application.MainLoop.Invoke(() =>
+                try
                 {
-                    UpdateActivityTable(activities);
-                    UpdateGraphTable(history);
-                });
+                    token.ThrowIfCancellationRequested();
+                    startedLoading = true;
+
+                    // Time from user action to gate acquisition (debounce + queue wait)
+                    _metrics.RecordDebounceWait(uiLatencyWatch.Elapsed);
+
+                    var loadWatch = Stopwatch.StartNew();
+                    var processor = _processorFactory.GetCurrentProcessor();
+
+                    List<GITActivityModel>? activities = null;
+                    List<GITActivityModel>? history = null;
+
+                    await processor.ProcessAsync(async cancellationToken =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        // Parallel loading: fetch activity + history at the same time
+                        var activityTask = _gitHubService.GetRepositoryActivityAsync(repo.Owner, repo.Name);
+                        var historyTask = _gitHubService.GetRepositoryActivityAsync(repo.Owner, repo.Name, settings.HistoryDays);
+
+                        await Task.WhenAll(activityTask, historyTask);
+
+                        activities = activityTask.Result;
+                        history = historyTask.Result;
+                    }, token);
+
+                    loadWatch.Stop();
+                    _metrics.RecordActivityLoad(loadWatch.Elapsed);
+
+                    token.ThrowIfCancellationRequested();
+
+                    // Atomic swap — safe for concurrent readers
+                    _currentActivities = activities!;
+
+                    UpdateActivityTable(activities!);
+                    UpdateGraphTable(history!);
+
+                    uiLatencyWatch.Stop();
+                    _metrics.RecordUiLatency(uiLatencyWatch.Elapsed);
+                }
+                finally
+                {
+                    _repoDataLoadGate.Release();
+                }
             }
             catch (OperationCanceledException)
             {
-                // User moved to another repo before debounce finished — expected
+                if (startedLoading)
+                    _metrics.RecordStaleSelection();
+                else
+                    _metrics.RecordCancelledSelection();
             }
             catch (Exception ex)
             {
@@ -95,6 +136,16 @@ namespace GITTUI.Views
                     _repoStatusItem!.Title = "Failed to load repository data";
                     _statusBar!.SetNeedsDisplay();
                 });
+            }
+            finally
+            {
+                lock (_debouncelock)
+                {
+                    if (ReferenceEquals(_repoSelectionCts, cts))
+                        _repoSelectionCts = null;
+                }
+
+                cts.Dispose();
             }
         }
     }

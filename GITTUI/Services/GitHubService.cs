@@ -1,4 +1,5 @@
 ﻿using GITTUI.Models;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Octokit;
@@ -10,19 +11,21 @@ namespace GITTUI.Services
         private readonly GitHubClient _client;
         private readonly ILogger<GitHubService> _logger;
         private readonly GitHubOptions _options;
+        private readonly MetricsService _metrics;
 
-        public GitHubService(string token, ILogger<GitHubService> logger, IOptions<GitHubOptions> options)
+        public GitHubService(string token, ILogger<GitHubService> logger, IOptions<GitHubOptions> options, MetricsService metrics)
         {
             _client = new GitHubClient(new ProductHeaderValue("Monitor"));
             _client.Credentials = new Credentials(token);
             _logger = logger;
             _options = options.Value;
+            _metrics = metrics;
         }
 
         public async Task<List<GITRepositoryModel>> GetRepositoriesAsync()
         {
             _logger.LogDebug("Calling GitHub API: GetAllForCurrent");
-            var octoRepos = await _client.Repository.GetAllForCurrent();
+            var octoRepos = await MeasureCallAsync(() => _client.Repository.GetAllForCurrent());
 
             if (octoRepos == null) throw new Exception("GitHub API returned no data.");
 
@@ -37,7 +40,7 @@ namespace GITTUI.Services
 
         public async Task<IReadOnlyList<Workflow>> GetWorkflowRunsAsync(string owner, string repoName)
         {
-            return (await _client.Actions.Workflows.List(owner, repoName)).Workflows;
+            return (await MeasureCallAsync(() => _client.Actions.Workflows.List(owner, repoName))).Workflows;
         }
 
         public async Task<List<GITActivityModel>> GetRepositoryActivityAsync(string owner, string repoName)
@@ -49,7 +52,7 @@ namespace GITTUI.Services
                 PageCount = _options.PageCount
             };
 
-            var response = await _client.Actions.Workflows.Runs.List(owner, repoName, workflowRequest, options);
+            var response = await MeasureCallAsync(() => _client.Actions.Workflows.Runs.List(owner, repoName, workflowRequest, options));
             return MapWorkflowRuns(response.WorkflowRuns);
         }
 
@@ -60,7 +63,7 @@ namespace GITTUI.Services
                 Created = $">={DateTime.UtcNow.AddDays(-days):yyyy-MM-dd}"
             };
 
-            var response = await _client.Actions.Workflows.Runs.List(owner, repoName, workflowRequest);
+            var response = await MeasureCallAsync(() => _client.Actions.Workflows.Runs.List(owner, repoName, workflowRequest));
             return MapWorkflowRuns(response.WorkflowRuns);
         }
 
@@ -80,20 +83,48 @@ namespace GITTUI.Services
 
         public async Task<IReadOnlyList<WorkflowJob>> GetWorkflowRunJobsAsync(string owner, string repoName, long runId)
         {
-            var response = await _client.Actions.Workflows.Jobs.List(owner, repoName, runId);
+            var response = await MeasureCallAsync(() => _client.Actions.Workflows.Jobs.List(owner, repoName, runId));
             return response.Jobs;
         }
 
         public async Task RerunFailedJobsAsync(string owner, string repoName, long runId)
         {
-            await _client.Actions.Workflows.Runs.RerunFailedJobs(owner, repoName, runId);
+            await MeasureCallAsync(() => _client.Actions.Workflows.Runs.RerunFailedJobs(owner, repoName, runId));
         }
 
         public async Task CreateWorkflowFileAsync(string owner, string repoName, string fileName, string yamlContent, string commitMessage)
         {
             var path = $".github/workflows/{fileName}";
             var request = new CreateFileRequest(commitMessage, yamlContent);
-            await _client.Repository.Content.CreateFile(owner, repoName, path, request);
+            await MeasureCallAsync(() => _client.Repository.Content.CreateFile(owner, repoName, path, request));
+        }
+
+        private async Task<T> MeasureCallAsync<T>(Func<Task<T>> action)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                return await action();
+            }
+            finally
+            {
+                stopwatch.Stop();
+                _metrics.RecordGitHubApiCall();
+            }
+        }
+
+        private async Task MeasureCallAsync(Func<Task> action)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                await action();
+            }
+            finally
+            {
+                stopwatch.Stop();
+                _metrics.RecordGitHubApiCall();
+            }
         }
     }
 }

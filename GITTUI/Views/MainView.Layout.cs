@@ -1,4 +1,5 @@
 using GITTUI.Components;
+using GITTUI.Services;
 using Terminal.Gui;
 using Attribute = Terminal.Gui.Attribute;
 
@@ -27,16 +28,30 @@ namespace GITTUI.Views
             _graphFrame = new GraphFrameView();
             _graphTable = _graphFrame.TableView;
 
-            (_statusBar, _repoStatusItem) = StatusBarFactory.Create(
+            (_statusBar, _repoStatusItem, _processorStatusItem, _settingsStatusItem, _metricsStatusItem) = StatusBarFactory.Create(
                 refreshAction: () => RefreshAllData(),
-                quitAction: () => Application.RequestStop()
+                quitAction: () => Application.RequestStop(),
+                processorName: _processorFactory.CurrentTaskType.ToString(),
+                settingsSummary: BuildSettingsSummary(),
+                metricsSummary: BuildMetricsSummary()
             );
 
             _menu = MenuBarFactory.Create(
-                refreshAction: () => LoadReposAsync(),
+                refreshAction: () =>
+                {
+                    RefreshAllData();
+                    return Task.CompletedTask;
+                },
                 quitAction: () => Application.RequestStop(),
                 createWorkflowAction: () => OpenCreateWorkflowDialog(),
-                benchmarkAction: () => RunBenchmark()
+                benchmarkAction: () => RunBenchmark(),
+                metricsAction: () => OpenMetricsDialog(),
+                settingsAction: () => OpenSettingsDialog(),
+                experimentAction: () => RunExperimentMatrix(),
+                useSequentialProcessorAction: () => SetTaskProcessor(TaskType.Sequential),
+                useLightweightProcessorAction: () => SetTaskProcessor(TaskType.Lightweight),
+                useConcurrentProcessorAction: () => SetTaskProcessor(TaskType.Concurrent),
+                useIsolatedProcessorAction: () => SetTaskProcessor(TaskType.Isolated)
             );
         }
 

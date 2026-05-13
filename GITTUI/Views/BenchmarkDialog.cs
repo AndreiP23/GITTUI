@@ -8,7 +8,7 @@ namespace GITTUI.Views
     {
         public static void Show(BenchmarkResult result)
         {
-            var dialog = new Dialog(" Processor Benchmark ", 70, 18)
+            var dialog = new Dialog(" Processor Benchmark ", 90, 22)
             {
                 ColorScheme = new ColorScheme
                 {
@@ -19,14 +19,18 @@ namespace GITTUI.Views
                 }
             };
 
-            static string Fmt(BenchmarkTimings t) =>
-                $"Mean {t.Mean,6:F0}ms | Med {t.Median,5}ms | Min {t.Min,5}ms | Max {t.Max,5}ms";
+            static string Row(string label, BenchmarkTimings t) =>
+                $"  {label,-22} {t}";
 
             var text = new Label(
-                $"  Lightweight (Task.Run):\n    {Fmt(result.Lightweight)}\n" +
-                $"  Concurrent  (Channel):\n    {Fmt(result.Concurrent)}\n" +
-                $"  Isolated    (LongRunning):\n    {Fmt(result.Isolated)}\n\n" +
-                $"  5 measured runs per processor (1 warmup).\n" +
+                $"  {_columnHeader}\n" +
+                Row("Sequential (baseline):", result.Sequential) + "\n" +
+                Row("Lightweight (Task.Run):", result.Lightweight) + "\n" +
+                Row("Concurrent  (Channel):", result.Concurrent) + "\n" +
+                Row("Isolated    (LongRun):", result.Isolated) + "\n\n" +
+                $"  Warmup: {result.WarmupRuns} runs (discarded)\n" +
+                $"  Measured: {result.MeasuredRuns} runs per processor\n" +
+                $"  Cache invalidated before every pass.\n" +
                 $"  Lower is better.")
             {
                 X = 1,
@@ -43,5 +47,8 @@ namespace GITTUI.Views
 
             Application.Run(dialog);
         }
+
+        private const string _columnHeader =
+            "Processor              mean      sd  p50  p95  p99  min  max";
     }
 }
